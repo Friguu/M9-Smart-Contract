@@ -21,6 +21,15 @@ import "ULToken.sol";
 
 contract UltimateLend {
 
+    //open changes
+    //add mapping Request => lender
+    //add whitelist for borrower & lender (either in this SC or in the token SC)
+    //add staking/collateral mechanism
+    //add return time 
+    //add msg.value to use ether more convenient instead of an int amount
+    //add service fee and pay it to the owner
+
+
     //using the OpenZeppelin SmartContract to count the amount of Requests
     using Counters for Counters.Counter;
     Counters.Counter internal requestID;
