@@ -15,8 +15,8 @@
 //to trustet people.
 pragma solidity ^0.8.9;
 
-import "node_modules/@openzeppelin/contracts/utils/Counters.sol";
-import "node_modules/@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "ULToken.sol";
 
 contract UltimateLend {
