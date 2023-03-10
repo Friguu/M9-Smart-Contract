@@ -24,9 +24,16 @@ contract UltimateLend {
     //open changes
     //add mapping Request => lender
     //add whitelist for borrower & lender (either in this SC or in the token SC)
+        //added a whitelist for lender in token SC
+        //is a whitelist for borrower needed?
     //add staking/collateral mechanism
     //add return time 
+
     //add msg.value to use ether more convenient instead of an int amount
+        //-> doesnt work. To use msg.value the function has to be payable
+        //-> if the function is payable the msg.value actually gets sent to the SC
+        //-> so if you create a money request with msg.value the lender actually pays the msg.value
+            // a real life solution would most likely implemented in the frontend
 
     //using the OpenZeppelin SmartContract to count the amount of Requests
     using Counters for Counters.Counter;
@@ -47,7 +54,7 @@ contract UltimateLend {
     mapping(address => uint256) debtAmount;
 
     //smart contract for our own Ultimate Lend Troken
-    IERC1155 ULToken;
+    ULToken public token;
     
     //since we are using ERC1155 on which you can mint multiple token, we have to specify the token ID
     uint256 currentTokenId;
@@ -76,7 +83,13 @@ contract UltimateLend {
 
     //modifier for functions that should only be executable by someone that owns the custom token
     modifier hasCustomToken() {
-        require(ULToken.balanceOf(msg.sender, currentTokenId) > 0);
+        require(token.balanceOf(msg.sender, currentTokenId) > 0);
+        _;
+    }
+
+    //modifier to check if the lender is also whitelisted
+    modifier isWhitelisted() {
+        require(token.isWhitelistedLender(msg.sender));
         _;
     }
 
@@ -84,7 +97,7 @@ contract UltimateLend {
     //both can be changed afterwards by the owner (owner = deployer of this contract)
     constructor(address _tokenSmartContract, uint256 _tokenId) {
 
-        ULToken = IERC1155(_tokenSmartContract);
+        token = ULToken(_tokenSmartContract);
         currentTokenId = _tokenId;
 
         owner = msg.sender;
@@ -196,7 +209,7 @@ contract UltimateLend {
 
     //function for the owner/deployer of this SC to change the smart contract for the custom Token
     function changeTokenSmartContract(address _smartContractAddress) public onlyOwner {
-        ULToken = IERC1155(_smartContractAddress);
+        token = ULToken(_smartContractAddress);
     }
 
     //function for the owner/deployer of this SC to change the token ID of the custom token
