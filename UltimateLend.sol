@@ -17,7 +17,7 @@ pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
-import "ULToken.sol";
+import "./ULToken.sol";
 
 contract UltimateLend {
 
