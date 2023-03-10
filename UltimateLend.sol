@@ -2,16 +2,16 @@
 
 //This is a Smart Contract that has a borrow/lend money function
 //The idea is as follows:
-//Person A wants to borrow 10 Ether. For that Person A creates a "Request". When the
-//Request is created, it is available for everyone. If Person B wants to lend Person A
+//Person A wants to lend 10 Ether. For that Person A creates a "Request". When the
+//Request is created, it is available for everyone. If Person B wants to borrow Person A
 //the 10 Ether, Person B accepts the "Request" and sends the 10 Ether to the Smart Contract.
-//Person A then has to pay back the borrowed amount (10 Ether), a fee as rewards for the lender
+//Person A then has to pay back the lent amount (10 Ether), a fee as rewards for the borrower
 //to incentivize people to lend money and a service fee for us maintaining the platform.
 //If all debts are paid back, the "Request" becomes fulfilled and is inactive. 
 //
-//To outsorce the problem of trust for borrowers we created our own token as ERC1155 Token.
+//To outsorce the problem of trust for lenders we created our own token as ERC1155 Token.
 //We assume, that only trusted people own this token (e.g. people have to be registered with their full name). 
-//By that, the Smart Contract for this task becomes cleaner and has an integrated safety function to only borrow money
+//By that, the Smart Contract for this task becomes cleaner and has an integrated safety function to only lend money
 //to trustet people.
 pragma solidity ^0.8.9;
 
@@ -27,14 +27,16 @@ contract UltimateLend {
     //add staking/collateral mechanism
     //add return time 
     //add msg.value to use ether more convenient instead of an int amount
-    //add service fee and pay it to the owner
-
 
     //using the OpenZeppelin SmartContract to count the amount of Requests
     using Counters for Counters.Counter;
     Counters.Counter internal requestID;
 
+    //safe the "owner" address of this smart contract
     address owner;
+
+    //store the address that receives the service fee
+    address payable receipientServiceFee;
 
     //enum for the states that a Request has
     enum requestState{created, accepted, fulfilled}
@@ -50,20 +52,23 @@ contract UltimateLend {
     //since we are using ERC1155 on which you can mint multiple token, we have to specify the token ID
     uint256 currentTokenId;
 
-    //structure contains all data of a Request to borrow money
+    //structure contains all data of a Request to lend money
     struct stc_moneyRequest {
-        address payable lender;     //the address that lends the money
-        address payable borrower;   //the address that requests the money
-        uint256 fees;               //the amount of fees to be paid by the borrower
+        address payable borrower;   //the address that gives the money
+        address payable lender;     //the address that requests the money
+        uint256 rewardFee;          //the amount of fees to be paid by the borrower
+        uint256 serviceFee;         //the amount of fees for the service provider
         uint256 borrowedAmount;     //the amount the borrower requests
         uint256 totalAmount;        //the requested amount + fees
         uint256 openAmount;         //the amount thats still open to be paid back by the borrower
         requestState state;         //the state of the current Request
+        bool serviceFeePaid;        //bool flag to check, wether the service fee for the request is paid or not
     }
 
     //map a Request ID to the Request data
     mapping(uint256 => stc_moneyRequest) public moneyRequests;
 
+    //a modifier for functions that only the owner of this smart contract can call
     modifier onlyOwner() {
         require(owner == msg.sender, "Ownable: caller is not the owner");
         _;
@@ -83,35 +88,51 @@ contract UltimateLend {
         currentTokenId = _tokenId;
 
         owner = msg.sender;
+        receipientServiceFee = payable(owner);
 
     }
 
     //____________
-    //Borrow functions
+    //Lend functions
 
-    //with this function a trusted person can open a Request to borrow money.
+    //with this function a trusted person can open a Request to lend money.
     function createMoneyRequest(uint256 _amount) public hasCustomToken {
         uint256 fees = calcFees(_amount);
-        uint256 totalAmount = _amount + fees;
-        moneyRequests[calcID()] = stc_moneyRequest(payable(address(0x0)), payable(msg.sender), fees, _amount, totalAmount, totalAmount, requestState.created);
+        uint256 serviceFee = calcServiceFee(_amount);
+        uint256 totalAmount = _amount + fees + serviceFee;
+        moneyRequests[calcID()] = stc_moneyRequest(payable(address(0x0)), payable(msg.sender), fees, serviceFee, _amount, 
+                                                        totalAmount, totalAmount, requestState.created, false);
         
     }
     
-    //if a Request is accepted and money is lent, this function is used to pay back the
-    //borrowed money and fees included
-    //add additional mapping for lender => requestID
+    //if a Request is accepted and money is borrowed, this function is used to pay back the
+    //lent amount and fees included
     function payDebts(uint256 _requestID) public payable {
-        require(msg.value > 0);
-        require(debtAmount[msg.sender] > 0);
-        require(debtAmount[msg.sender] >= msg.value);
-        require(moneyRequests[_requestID].state == requestState.accepted);
+        //the msg.value has to be greater than 0 to pay back at least anything
+        require(msg.value > 0, "Error: you can't pay 0 Token back");
+        //the amount of open debts has to greater than 0, otherwise nothing is left to paid back
+        require(debtAmount[msg.sender] > 0, "Error: no debts left");
+        //the debt amount has to be greater or equal to the msg value, otherwise maybe too much is paid back
+        require(debtAmount[msg.sender] >= msg.value, "Error: more token sent that there are open debts");
+        //the state of the request has to be "accepted", otherwise it is only created or already fulfilled
+        require(moneyRequests[_requestID].state == requestState.accepted, "Error: the request is no accepted or already fulfilled");
 
-        //transfer the paid money to the lender
-        moneyRequests[_requestID].lender.transfer(msg.value);
+        //store the msg value to evetually decrease it by the serice fee
+        uint256 amount = msg.value;
+
+        //if the service fee is not paid, pay it
+        if(!moneyRequests[_requestID].serviceFeePaid){
+            receipientServiceFee.transfer(moneyRequests[_requestID].serviceFee);
+            amount -= moneyRequests[_requestID].serviceFee;
+            moneyRequests[_requestID].serviceFeePaid = true;
+        }
+
+        //transfer the paid money to the borrower
+        moneyRequests[_requestID].borrower.transfer(amount);
 
         //reduce debts by the paid amount
         moneyRequests[_requestID].openAmount -= msg.value;
-        debtAmount[msg.sender] -= moneyRequests[_requestID].openAmount;
+        debtAmount[msg.sender] = moneyRequests[_requestID].openAmount;
 
 
         //bring to an own internal function
@@ -128,14 +149,15 @@ contract UltimateLend {
     }
 
     //____________
-    //Lend functions
+    //Borrow functions
 
-    //to accept an open Request this function is called. As message
-    //value the amount to be lend is required, therefor the function is
-    //marked as payable
-    function lendMoney(uint256 _requestID) public payable {
-        require(msg.value == moneyRequests[_requestID].borrowedAmount);
-        require(moneyRequests[_requestID].state == requestState.created);
+    //to accept an open Request this function is called. The function is
+    //marked as payable to send token
+    function acceptRequest(uint256 _requestID) public payable {
+        //the message value the amount to be borrowed is required
+        require(msg.value == moneyRequests[_requestID].borrowedAmount, "Error: sent amount is not equal to requested amount");
+        //the state has to be created to be accepted, otherwise the request is already accepted or fulfilled
+        require(moneyRequests[_requestID].state == requestState.created, "Error: the request is already accepted or fulfilled");
         
         //set the lender for this money request
         moneyRequests[_requestID].lender = payable(msg.sender);
@@ -147,20 +169,22 @@ contract UltimateLend {
         moneyRequests[_requestID].state = requestState.accepted;
 
         //set debt counter for borrower
-        debtAmount[moneyRequests[_requestID].borrower] = moneyRequests[_requestID].totalAmount;
+        debtAmount[moneyRequests[_requestID].lender] = moneyRequests[_requestID].totalAmount;
 
     }
 
     //____________
     //Util functions 
 
-    //calculates the overall amount fees for lender + service fee
+    //calculates the overall amount fees for lender
     function calcFees(uint256 _amount) pure public returns(uint256) {
+        //calculate 2%
         return _amount*2/100;
     }
 
-    //this calculates the service fee part
+    //this calculates the service fee
     function calcServiceFee(uint256 _overallFees) pure public returns(uint256) {
+        //calculate 1%
         return _overallFees*1/100;
     }
 
