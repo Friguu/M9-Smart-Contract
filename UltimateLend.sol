@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 
 //This is a Smart Contract that has a borrow/lend money function
+//lender = the one that gets the money
+//borrower = the one that gives the money
 //The idea is as follows:
 //Person A wants to lend 10 Ether. For that Person A creates a "Request". When the
 //Request is created, it is available for everyone. If Person B wants to borrow Person A
@@ -23,17 +25,17 @@ contract UltimateLend {
 
     //open changes
     //add mapping Request => lender
-    //add whitelist for borrower & lender (either in this SC or in the token SC)
-        //added a whitelist for lender in token SC
-        //is a whitelist for borrower needed?
     //add staking/collateral mechanism
-    //add return time 
 
     //add msg.value to use ether more convenient instead of an int amount
         //-> doesnt work. To use msg.value the function has to be payable
         //-> if the function is payable the msg.value actually gets sent to the SC
         //-> so if you create a money request with msg.value the lender actually pays the msg.value
             // a real life solution would most likely implemented in the frontend
+        
+        //-> another solution would be to multiply the input by 1,000,000,000,000,000,000
+
+    //add return time -> see time_error_problem.txt
 
     //using the OpenZeppelin SmartContract to count the amount of Requests
     using Counters for Counters.Counter;
@@ -83,13 +85,13 @@ contract UltimateLend {
 
     //modifier for functions that should only be executable by someone that owns the custom token
     modifier hasCustomToken() {
-        require(token.balanceOf(msg.sender, currentTokenId) > 0);
+        require(token.balanceOf(msg.sender, currentTokenId) > 0, "Error: account has no ULToken");
         _;
     }
 
     //modifier to check if the lender is also whitelisted
     modifier isWhitelisted() {
-        require(token.isWhitelistedLender(msg.sender));
+        require(token.isWhitelistedLender(msg.sender), "Error: account is not whitelisted");
         _;
     }
 
@@ -109,13 +111,12 @@ contract UltimateLend {
     //Lend functions
 
     //with this function a trusted person can open a Request to lend money.
-    function createMoneyRequest(uint256 _amount) public hasCustomToken {
+    function createMoneyRequest(uint256 _amount) public hasCustomToken isWhitelisted {
         uint256 fees = calcFees(_amount);
         uint256 serviceFee = calcServiceFee(_amount);
         uint256 totalAmount = _amount + fees + serviceFee;
         moneyRequests[calcID()] = stc_moneyRequest(payable(address(0x0)), payable(msg.sender), fees, serviceFee, _amount, 
                                                         totalAmount, totalAmount, requestState.created, false);
-        
     }
     
     //if a Request is accepted and money is borrowed, this function is used to pay back the
@@ -173,10 +174,10 @@ contract UltimateLend {
         require(moneyRequests[_requestID].state == requestState.created, "Error: the request is already accepted or fulfilled");
         
         //set the lender for this money request
-        moneyRequests[_requestID].lender = payable(msg.sender);
+        moneyRequests[_requestID].borrower = payable(msg.sender);
 
         //transfer the lent money to the borrower
-        moneyRequests[_requestID].borrower.transfer(msg.value);
+        moneyRequests[_requestID].lender.transfer(msg.value);
 
         //change state of the money request
         moneyRequests[_requestID].state = requestState.accepted;

@@ -39,4 +39,8 @@ contract ULToken is ERC1155 {
         return whitelistLender[_lender];
     }
 
+    function blockFromWhitelist(address _addr) public returns (bool) {
+        return whitelistLender[_addr] = false;
+    }
+
 }

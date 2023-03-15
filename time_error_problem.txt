@@ -1,0 +1,18 @@
+create request: 15.03.2023 17:39
+
+check block timestamp: 15.03.2023 19:39
+
+accepted request: 16:03 13:00
+
+check block timestampt: 16.03.23 13:05
+
+return time to pay back money: 23.03.23 19:39:01 - open
+close_request() 19:39:02 - open
+
+block mined: 19:40:25
+
+
+
+24.03.23 - 
+
+10.11.23 - 
