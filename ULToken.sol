@@ -36,7 +36,7 @@ contract ULToken is ERC1155 {
     function mint(address account, uint256 id, uint256 amount)
         public onlyOwner
     {   
-        require(whitelistLender[account] == true, "Error: borrower already exists");
+        require(whitelistLender[account] != true, "Error: borrower already exists");
         //data not needed in our use case, so we just pass a dummy value
         bytes memory data = '0x';
         _mint(account, id, amount, data);
@@ -52,8 +52,8 @@ contract ULToken is ERC1155 {
     }
 
     //this function either returns if an address is on the whitelist or blocked
-    function isWhitelistedLender(address _lender) public view returns (bool) {
-        return whitelistLender[_lender];
+    function isWhitelistedLender(address _borrower) public view returns (bool) {
+        return whitelistLender[_borrower];
     }
 
     //this function is used to block an address from whitelist

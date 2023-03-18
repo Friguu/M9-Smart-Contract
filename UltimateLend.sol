@@ -51,8 +51,8 @@ contract UltimateLend {
 
     //structure contains all data of a Request to borrow money
     struct stc_moneyRequest {
-        address payable borrower;   //the address that gets the money
-        address payable lender;     //the address that gives the money
+        address payable lender;     //the address that gets the money
+        address payable borrower;   //the address that gives the money
         uint256 rewardFee;          //the amount of fees to be paid by the lender
         uint256 serviceFee;         //the amount of fees for the service provider
         uint256 borrowedAmount;     //the amount the borrower requests
@@ -100,7 +100,7 @@ contract UltimateLend {
 
     //with this function a trusted person can open a Request to lend money.
     function createMoneyRequest(uint256 _amount) public hasCustomToken isWhitelisted {
-        require(getOpenDebts() != 0, "Error: you already have open debts");
+        require(getOpenDebts() == 0, "Error: you already have open debts");
 
         uint256 amountWei = _amount * 1000000000000000000;
 
@@ -140,7 +140,7 @@ contract UltimateLend {
         }
 
         //transfer the paid money to the lender
-        moneyRequests[requestOfBorrower[msg.sender]].borrower.transfer(amount);
+        moneyRequests[requestOfBorrower[msg.sender]].lender.transfer(amount);
 
         //reduce debts by the paid amount
         moneyRequests[requestOfBorrower[msg.sender]].openAmount -= msg.value;
@@ -181,7 +181,7 @@ contract UltimateLend {
         moneyRequests[_requestID].state = requestState.accepted;
 
         //set debt counter for borrower
-        debtAmount[moneyRequests[_requestID].lender] = moneyRequests[_requestID].totalAmount;
+        debtAmount[moneyRequests[_requestID].borrower] = moneyRequests[_requestID].totalAmount;
 
     }
 
