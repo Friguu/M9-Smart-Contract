@@ -51,10 +51,12 @@ contract ULToken is ERC1155 {
         _mintBatch(to, ids, amounts, data);
     }
 
+    //this function either returns if an address is on the whitelist or blocked
     function isWhitelistedLender(address _lender) public view returns (bool) {
         return whitelistLender[_lender];
     }
 
+    //this function is used to block an address from whitelist
     function blockFromWhitelist(address _addr) public returns (bool) {
         return whitelistLender[_addr] = false;
     }

@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT
 
 //This is a Smart Contract that has a borrow/lend money function
-//borrower = the one that gets the money
-//lender = the one that gives the money
+
 //The idea is as follows:
 //Person A wants to borrow 10 Ether. For that Person A creates a "Request". When the
-//Request is created, it is available for everyone. If Person B wants to borrow Person A
+//Request is created, it is available for everyone. If Person B wants to lend Person A
 //the 10 Ether, Person B accepts the "Request" and sends the 10 Ether to the Smart Contract.
-//Person A then has to pay back the lent amount (10 Ether), a fee as rewards for the borrower
+//Person A then has to pay back the borrowed amount (10 Ether), a fee as reward for the lender
 //to incentivize people to lend money and a service fee for us maintaining the platform.
 //If all debts are paid back, the "Request" becomes fulfilled and is inactive. 
 //
@@ -41,8 +40,8 @@ contract UltimateLend {
     //thats why we the mapping)
     mapping(address => uint256) debtAmount;
 
-    //mapping that maps the address of the lender to a request ID => by that a lender can only have one active request
-    mapping(address => uint256) requestOfLender;
+    //mapping that maps the address of the borrower to a request ID => by that a borrower can only have one active request
+    mapping(address => uint256) requestOfBorrower;
 
     //smart contract for our own Ultimate Lend Troken
     ULToken public token;
@@ -50,11 +49,11 @@ contract UltimateLend {
     //since we are using ERC1155 on which you can mint multiple token, we have to specify the token ID
     uint256 currentTokenId;
 
-    //structure contains all data of a Request to lend money
+    //structure contains all data of a Request to borrow money
     struct stc_moneyRequest {
-        address payable borrower;   //the address that gives the money
-        address payable lender;     //the address that requests the money
-        uint256 rewardFee;          //the amount of fees to be paid by the borrower
+        address payable borrower;   //the address that gets the money
+        address payable lender;     //the address that gives the money
+        uint256 rewardFee;          //the amount of fees to be paid by the lender
         uint256 serviceFee;         //the amount of fees for the service provider
         uint256 borrowedAmount;     //the amount the borrower requests
         uint256 totalAmount;        //the requested amount + fees
@@ -78,7 +77,7 @@ contract UltimateLend {
         _;
     }
 
-    //modifier to check if the lender is also whitelisted
+    //modifier to check if the borrower is also whitelisted
     modifier isWhitelisted() {
         require(token.isWhitelistedLender(msg.sender), "Error: account is not whitelisted");
         _;
@@ -97,7 +96,7 @@ contract UltimateLend {
     }
 
     //____________
-    //Lend functions
+    //Borrow functions
 
     //with this function a trusted person can open a Request to lend money.
     function createMoneyRequest(uint256 _amount) public hasCustomToken isWhitelisted {
@@ -112,11 +111,11 @@ contract UltimateLend {
         moneyRequests[calcID()] = stc_moneyRequest(payable(address(0x0)), payable(msg.sender), calcFees(amountWei), calcServiceFee(amountWei), 
                                                         amountWei, totalAmount, totalAmount, requestState.created, false);
 
-        requestOfLender[msg.sender] = requestID.current();
+        requestOfBorrower[msg.sender] = requestID.current();
     }
     
     //if a Request is accepted and money is borrowed, this function is used to pay back the
-    //lent amount and fees included
+    //borrowed amount and fees included
     function payDebts() public payable {
         //the msg.value has to be greater than 0 to pay back at least anything
         require(msg.value > 0, "Error: you can't pay 0 Token back");
@@ -124,34 +123,34 @@ contract UltimateLend {
         require(debtAmount[msg.sender] > 0, "Error: no debts left");
         //the debt amount has to be greater or equal to the msg value, otherwise maybe too much is paid back
         require(debtAmount[msg.sender] >= msg.value, "Error: more token sent that there are open debts");
-        //a valid request ID has to be stored for the lender; required because the request ID is necessary for further computing
-        require(requestOfLender[msg.sender] != 0, "Error: no valid request ID for this account");
+        //a valid request ID has to be stored for the borrower; required because the request ID is necessary for further computing
+        require(requestOfBorrower[msg.sender] != 0, "Error: no valid request ID for this account");
         //the state of the request has to be "accepted", otherwise it is only created or already fulfilled
-        require(moneyRequests[requestOfLender[msg.sender]].state == requestState.accepted, "Error: the request is no accepted or already fulfilled");
+        require(moneyRequests[requestOfBorrower[msg.sender]].state == requestState.accepted, "Error: the request is no accepted or already fulfilled");
         
 
         //store the msg value to evetually decrease it by the serice fee
         uint256 amount = msg.value;
 
         //if the service fee is not paid, pay it
-        if(!moneyRequests[requestOfLender[msg.sender]].serviceFeePaid){
-            receipientServiceFee.transfer(moneyRequests[requestOfLender[msg.sender]].serviceFee);
-            amount -= moneyRequests[requestOfLender[msg.sender]].serviceFee;
-            moneyRequests[requestOfLender[msg.sender]].serviceFeePaid = true;
+        if(!moneyRequests[requestOfBorrower[msg.sender]].serviceFeePaid){
+            receipientServiceFee.transfer(moneyRequests[requestOfBorrower[msg.sender]].serviceFee);
+            amount -= moneyRequests[requestOfBorrower[msg.sender]].serviceFee;
+            moneyRequests[requestOfBorrower[msg.sender]].serviceFeePaid = true;
         }
 
-        //transfer the paid money to the borrower
-        moneyRequests[requestOfLender[msg.sender]].borrower.transfer(amount);
+        //transfer the paid money to the lender
+        moneyRequests[requestOfBorrower[msg.sender]].borrower.transfer(amount);
 
         //reduce debts by the paid amount
-        moneyRequests[requestOfLender[msg.sender]].openAmount -= msg.value;
-        debtAmount[msg.sender] = moneyRequests[requestOfLender[msg.sender]].openAmount;
+        moneyRequests[requestOfBorrower[msg.sender]].openAmount -= msg.value;
+        debtAmount[msg.sender] = moneyRequests[requestOfBorrower[msg.sender]].openAmount;
 
 
         //bring to an own internal function
         //if all debts are paid, note that in the variables
-        if(moneyRequests[requestOfLender[msg.sender]].openAmount == 0) {
-            moneyRequests[requestOfLender[msg.sender]].state = requestState.fulfilled;
+        if(moneyRequests[requestOfBorrower[msg.sender]].openAmount == 0) {
+            moneyRequests[requestOfBorrower[msg.sender]].state = requestState.fulfilled;
         }
     }
 
@@ -162,7 +161,7 @@ contract UltimateLend {
     }
 
     //____________
-    //Borrow functions
+    //Lend functions
 
     //to accept an open Request this function is called. The function is
     //marked as payable to send token
@@ -173,10 +172,10 @@ contract UltimateLend {
         require(moneyRequests[_requestID].state == requestState.created, "Error: the request is already accepted or fulfilled");
         
         //set the lender for this money request
-        moneyRequests[_requestID].borrower = payable(msg.sender);
+        moneyRequests[_requestID].lender = payable(msg.sender);
 
         //transfer the lent money to the borrower
-        moneyRequests[_requestID].lender.transfer(msg.value);
+        moneyRequests[_requestID].borrower.transfer(msg.value);
 
         //change state of the money request
         moneyRequests[_requestID].state = requestState.accepted;
