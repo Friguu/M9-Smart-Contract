@@ -36,4 +36,4 @@ The ULToken smart contract includes standard ERC-20 functions, such as balanceOf
 changeTokenSmartContract(address \_smartContractAddress) public onlyOwner: Allows the owner/deployer of the smart contract to change the smart contract for the custom token.
 changeTokenId(uint256 \_tokenId) public onlyOwner: Allows the owner/deployer of the smart contract to change the token ID of the custom token.
 ##License
-The UltimateLend and ULToken smart contracts belongs to group2 of Blokchain master degree Zigurat: @BENEDICT CONRADY and @ABDERRAHMANE CHOUKRI and KITTIPOOM AKSORNSUA.
+The UltimateLend and ULToken smart contracts belongs to group2 of Blokchain master degree Zigurat: @BENEDICT CONRADY and @ABDERRAHMANE CHOUKRI and @KITTIPOOM AKSORNSUA.
